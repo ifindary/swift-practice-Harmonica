@@ -1,10 +1,3 @@
-//
-//  NavigationManager.swift
-//  Harmonica
-//
-//  Created by 나현흠 on 6/9/25.
-//
-
 import SwiftUI
 
 // View의 종류에 대한 Enum
