@@ -2,87 +2,114 @@
 import SwiftUI
 import AVFoundation
 
-@Observable // 이거랑 ObservableObject가 동시에 필요할까?
 class KaraokeLyricViewModel: ObservableObject {
-    // MARK: - State
-    @Published private var currentLineIndex: Int = 0
-    @Published private var currentLine: LyricLine = LyricLine(text: "", timings: [])
-    @Published private var currentCharacterIndex: Int = 0
-    @Published private var currentCharacterProgress: CGFloat = 0.0
-    @Published private var currentCharDuration: Double = 0.0
-    @Published private var startTime: Date = Date()
-    @Published private var countdown: Int? = nil
-    @Published private var countdownTimer: Timer?
-    @Published private var isCountingDown = false
+    // MARK: - StateC
+    private var currentLineIndex: Int = 0
+    private var currentLine: LyricLine = LyricLine(text: "", timings: [])
+    private var currentCharacterIndex: Int = 0
+    @Published var currentCharacterProgress: CGFloat = 0.0
+    private var currentCharDuration: Double = 0.0
+    private var startTime: Date = Date()
+    @Published var countdown: Int? = nil
+    private var countdownTimer: Timer?
+    private var isCountingDown = false
     
-    @Published private var nextLineIndex: Int = 1
-    @Published private var nextLine: LyricLine = LyricLine(text: "", timings: [])
-    @Published private var nextCharacterIndex: Int = 0
-    @Published private var nextCharacterProgress: CGFloat = 0.0
-    @Published private var nextCharDuration: Double = 0.0
-    @Published private var nextstartTime: Date = Date()
+    private var nextLineIndex: Int = 1
+    private var nextLine: LyricLine = LyricLine(text: "", timings: [])
+    private var nextCharacterIndex: Int = 0
+    @Published var nextCharacterProgress: CGFloat = 0.0
+    private var nextCharDuration: Double = 0.0
+    private var nextstartTime: Date = Date()
     
     // 음악 재생 관련 State
     let songInfo: SongInfo
-    @Published private var player: AVPlayer = AVPlayer()
-    @Published private var mode: PlayMode = .ar
-    @Published private var currentTime: Double = 0
-    @Published private var playbackTimer: Timer?
-    @Published private var autoProgressTimer: Timer?
-    @Published private var currentSegmentIndex = 0
-    @Published private var segments: [LyricSegment] = []
-    @Published private var lyricLines: [LyricLine] = []
-    @Published private var isPlaying = false
+    private var player: AVPlayer = AVPlayer()
+    @Published var mode: PlayMode = .ar
+    private var currentTime: Double = 0
+    private var playbackTimer: Timer?
+    private var autoProgressTimer: Timer?
+    @Published var currentSegmentIndex = 0
+    @Published var segments: [LyricSegment] = []
+    @Published var lyricLines: [LyricLine] = []
+    @Published var isPlaying = false
     
     // 메트로놈 관련 State
-    @Published private var metronomeStartTime: Date?
-    @Published private var currentBeat: Int = 0
-    @Published private var beatProgress: CGFloat = 0.0
-    @Published private var isMetronomeActive = false
-    @Published private var lastBeatTime: Date = Date()
-    @Published private var metronomePlayer: AVAudioPlayer?
+    private var metronomeStartTime: Date?
+    private var currentBeat: Int = 0
+    private var beatProgress: CGFloat = 0.0
+    private var isMetronomeActive = false
+    private var lastBeatTime: Date = Date()
+    private var metronomePlayer: AVAudioPlayer?
 
     //View용 State
-    @Published private var isBackPressed: Bool = false
-    @Published private var isRetryPressed: Bool = false
-    @Published private var isNextPressed: Bool = false
+    @Published var isBackPressed: Bool = false
+    @Published var isRetryPressed: Bool = false
+    @Published var isNextPressed: Bool = false
     
-    @Published private var beatsPerMeasure: Int {
+    init(songInfo: SongInfo) {
+        self.songInfo = songInfo
+    }
+    
+    var beatsPerMeasure: Int {
         songInfo.timeSignatureTop
     }
 
-    @Published private var beatDuration: Double {
+    private var beatDuration: Double {
         60.0 / Double(songInfo.bpm)
     }
     
-    @Published var hasNextLine: Bool {
+    var hasNextLine: Bool {
         guard nextLineIndex < lyricLines.count,
               nextLineIndex < segments.count,
               currentSegmentIndex < segments.count else { return false }
         return segments[currentSegmentIndex].index == segments[nextLineIndex].index
     }
     
-    @Published var lyricsWithDuration: [(String, Double)] {
+    var lyricsWithDuration: [(String, Double)] {
         currentLine.characterDurations
     }
     
-    @Published var NextlyricsWithDuration: [(String, Double)] {
+    var NextlyricsWithDuration: [(String, Double)] {
         nextLine.characterDurations
     }
     
-    @Published let fullText = lyricsWithDuration.map { $0.0 }.joined()
-    @Published let highlightedText = lyricsWithDuration.prefix(currentCharacterIndex).map { $0.0 }.joined()
-    @Published let currentChar = currentCharacterIndex < lyricsWithDuration.count ? lyricsWithDuration[currentCharacterIndex].0 : ""
+    var fullText: String {
+        lyricsWithDuration.map { $0.0 }.joined()
+    }
+    var highlightedText: String {
+        lyricsWithDuration.prefix(currentCharacterIndex).map { $0.0 }.joined()
+    }
+    var currentChar: String {
+        currentCharacterIndex < lyricsWithDuration.count ? lyricsWithDuration[currentCharacterIndex].0 : ""
+    }
     
-    @Published let nextfullText = NextlyricsWithDuration.map { $0.0 }.joined()
-    @Published let nexthighlightedtext = NextlyricsWithDuration.prefix(nextCharacterIndex).map { $0.0 }.joined()
-    @Published let nextcurrentChar = nextCharacterIndex < NextlyricsWithDuration.count ? NextlyricsWithDuration[nextCharacterIndex].0 : ""
+    var nextfullText: String {
+        NextlyricsWithDuration.map { $0.0 }.joined()
+    }
     
+    var nexthighlightedtext: String {
+        NextlyricsWithDuration.prefix(nextCharacterIndex).map { $0.0 }.joined()
+    }
+    var nextcurrentChar: String {
+        nextCharacterIndex < NextlyricsWithDuration.count ? NextlyricsWithDuration[nextCharacterIndex].0 : ""
+    }
     
     // MARK: - Test
+    func isModeAR() -> Bool {
+        return mode == .ar
+    }
     
+    func isCountdownActive() -> Bool {
+        return countdown != nil
+    }
     
-    func updateTimer() {
+    func updateAllTimers() {
+        updateTimerCurrent()
+        updateTimerNext()
+        updateMetronome()
+    }
+    
+    func updateTimerCurrent() {
         guard countdown == nil else { return }
         guard currentCharacterIndex < lyricsWithDuration.count else { return }
         
@@ -100,7 +127,7 @@ class KaraokeLyricViewModel: ObservableObject {
         }
     }
     
-    func updateTimer2() {
+    func updateTimerNext() {
         guard countdown == nil else { return }
         guard hasNextLine else { return }
         guard nextCharacterIndex < NextlyricsWithDuration.count else { return }
@@ -377,8 +404,8 @@ class KaraokeLyricViewModel: ObservableObject {
                 
                 if mode == .ar {
                     autoProgressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { _ in
-                        mode = .mr
-                        startMRPlayback(segment: segment)
+                        self.mode = .mr
+                        self.startMRPlayback(segment: segment)
                     }
                 } else {
                     isPlaying = false
@@ -430,26 +457,26 @@ class KaraokeLyricViewModel: ObservableObject {
         let countdownInterval = beatDuration
         
         countdownTimer = Timer.scheduledTimer(withTimeInterval: countdownInterval, repeats: true) { timer in
-            guard let currentCount = countdown else { return }
+            guard let currentCount = self.countdown else { return }
             
-            countdown = currentCount + 1
+            self.countdown = currentCount + 1
             
-            if countdown! >= 4 {
-                countdown = nil
-                isCountingDown = false
+            if self.countdown! >= 4 {
+                self.countdown = nil
+                self.isCountingDown = false
                 timer.invalidate()
-                countdownTimer = nil
+                self.countdownTimer = nil
                 
-                guard currentSegmentIndex < segments.count else { return }
-                let segment = segments[currentSegmentIndex]
-                player.play()
-                startPlaybackTimer(segment: segment)
+                guard self.currentSegmentIndex < self.segments.count else { return }
+                let segment = self.segments[self.currentSegmentIndex]
+                self.player.play()
+                self.startPlaybackTimer(segment: segment)
                 
-                currentCharDuration = lyricsWithDuration.first?.1 ?? 0.0
-                startTime = Date()
-                if hasNextLine {
-                    nextCharDuration = NextlyricsWithDuration.first?.1 ?? 0.0
-                    nextstartTime = Date()
+                self.currentCharDuration = self.lyricsWithDuration.first?.1 ?? 0.0
+                self.startTime = Date()
+                if self.hasNextLine {
+                    self.nextCharDuration = self.NextlyricsWithDuration.first?.1 ?? 0.0
+                    self.nextstartTime = Date()
                 }
             }
         }
@@ -464,26 +491,26 @@ class KaraokeLyricViewModel: ObservableObject {
         let countdownInterval = beatDuration
         
         countdownTimer = Timer.scheduledTimer(withTimeInterval: countdownInterval, repeats: true) { timer in
-            guard let currentCount = countdown else { return }
+            guard let currentCount = self.countdown else { return }
             
-            countdown = currentCount + 1
+            self.countdown = currentCount + 1
             
-            if countdown! >= 4 {
-                countdown = nil
-                isCountingDown = false
+            if self.countdown! >= 4 {
+                self.countdown = nil
+                self.isCountingDown = false
                 timer.invalidate()
-                countdownTimer = nil
+                self.countdownTimer = nil
                 
-                guard currentSegmentIndex < segments.count else { return }
-                let segment = segments[currentSegmentIndex]
-                player.play()
-                startPlaybackTimer(segment: segment)
+                guard self.currentSegmentIndex < self.segments.count else { return }
+                let segment = self.segments[self.currentSegmentIndex]
+                self.player.play()
+                self.startPlaybackTimer(segment: segment)
                 
-                currentCharDuration = lyricsWithDuration.first?.1 ?? 0.0
-                startTime = Date()
-                if hasNextLine {
-                    nextCharDuration = NextlyricsWithDuration.first?.1 ?? 0.0
-                    nextstartTime = Date()
+                self.currentCharDuration = self.lyricsWithDuration.first?.1 ?? 0.0
+                self.startTime = Date()
+                if self.hasNextLine {
+                    self.nextCharDuration = self.NextlyricsWithDuration.first?.1 ?? 0.0
+                    self.nextstartTime = Date()
                 }
             }
         }

@@ -34,7 +34,7 @@ struct KaraokeLyricView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    Image(viewModel.mode == .ar ? "SeonChang": "WhoChang")
+                    Image(viewModel.isModeAR() ? "SeonChang": "WhoChang")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 121, height: 67)
@@ -44,7 +44,7 @@ struct KaraokeLyricView: View {
             }
             .frame(width: 1250, height: 279)
                 
-            if viewModel.isPlaying || viewModel.countdown != nil {
+            if viewModel.isPlaying || viewModel.isCountdownActive() {
                 HStack(spacing: 20) {
                     ForEach(0..<viewModel.beatsPerMeasure, id: \.self) { index in
                         ZStack {
@@ -232,15 +232,8 @@ struct KaraokeLyricView: View {
             viewModel.stopPlayback()
             viewModel.stopMetronome()
         }
-        
         .onReceive(timer) { _ in
-            viewModel.updateTimer()
-        }
-        .onReceive(timer) { _ in
-            viewModel.updateTimer2() // 수정 필요
-        }
-        .onReceive(timer) { _ in
-            viewModel.updateMetronome()
+            viewModel.updateAllTimers()
         }
     }
 }

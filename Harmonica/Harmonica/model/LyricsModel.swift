@@ -1,5 +1,3 @@
-// LyricsModel.swift
-
 import Foundation
 
 struct LyricLine {
@@ -40,3 +38,4 @@ enum PlayMode {
     case ar
     case mr
 }
+
